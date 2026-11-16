@@ -10,6 +10,11 @@ st.set_page_config(
     layout="wide"
 )
 
+# ---------------- VERCEL FASTAPI BACKEND ----------------
+
+API_URL = "https://indian-urban-house-price-prediction-d9jcuz2i3-bhargavi-aeea.vercel.app/predict"
+
+
 # ---------------- CUSTOM CSS ----------------
 
 st.markdown("""
@@ -133,8 +138,8 @@ st.sidebar.markdown("### 📊 Project Overview")
 st.sidebar.write("**Project:** Indian Urban House Price Prediction")
 st.sidebar.write("**Model:** Decision Tree Regressor")
 st.sidebar.write("**Dataset:** 100,000 Properties")
-st.sidebar.write("**Backend:** FastAPI")
-st.sidebar.write("**Frontend:** Streamlit")
+st.sidebar.write("**Backend:** FastAPI (Vercel)")
+st.sidebar.write("**Frontend:** Streamlit (Render)")
 
 st.sidebar.markdown("---")
 
@@ -147,7 +152,7 @@ st.sidebar.write("4. View the estimated price.")
 
 st.sidebar.markdown("---")
 
-st.sidebar.success("Prediction API: 127.0.0.1:8000")
+st.sidebar.success("Prediction API: Vercel Backend")
 
 
 # ---------------- PAGE HEADER ----------------
@@ -281,7 +286,10 @@ with st.form("house_prediction_form"):
         c1, c2, c3 = st.columns(3)
 
         with c1:
-            Parking = st.selectbox("Parking", [1, 0], format_func=lambda x: "Yes" if x == 1 else "No")
+            Parking = st.selectbox(
+                "Parking", [1, 0],
+                format_func=lambda x: "Yes" if x == 1 else "No"
+            )
 
             Lift_Available = st.selectbox(
                 "Lift Available", [1, 0],
@@ -495,89 +503,92 @@ if submitted:
         with st.spinner("🏠 Analyzing property details..."):
 
             response = requests.post(
-                "http://127.0.0.1:8000/predict",
+                API_URL,
                 json=data,
-                timeout=30
+                timeout=60
             )
 
-        if response.status_code == 200:
+        response.raise_for_status()
 
-            result = response.json()
+        result = response.json()
 
-            st.markdown("---")
+        st.markdown("---")
 
-            st.markdown(
-                '<p class="section-heading">🎯 Your Prediction Results</p>',
-                unsafe_allow_html=True
-            )
+        st.markdown(
+            '<p class="section-heading">🎯 Your Prediction Results</p>',
+            unsafe_allow_html=True
+        )
 
-            st.success("House price prediction completed successfully!")
+        st.success("House price prediction completed successfully!")
 
-            st.markdown(
-                f"""
-                <div class="result-card">
-                    <div class="result-label">
-                        ESTIMATED PROPERTY PRICE
-                    </div>
-                    <div class="result-price">
-                        ₹ {result['predicted_price_in_lakhs']:,.2f} Lakhs
-                    </div>
-                    <div class="result-label">
-                        Property ID: {result['Property_ID']}
-                    </div>
+        st.markdown(
+            f"""
+            <div class="result-card">
+                <div class="result-label">
+                    ESTIMATED PROPERTY PRICE
                 </div>
-                """,
-                unsafe_allow_html=True
+                <div class="result-price">
+                    ₹ {result['predicted_price_in_lakhs']:,.2f} Lakhs
+                </div>
+                <div class="result-label">
+                    Property ID: {result['Property_ID']}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        st.write("")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.metric(
+                "Estimated Price in Lakhs",
+                f"₹ {result['predicted_price_in_lakhs']:,.2f}"
             )
 
-            st.write("")
-
-            col1, col2 = st.columns(2)
-
-            with col1:
-                st.metric(
-                    "Estimated Price in Lakhs",
-                    f"₹ {result['predicted_price_in_lakhs']:,.2f}"
-                )
-
-            with col2:
-                st.metric(
-                    "Estimated Price in INR",
-                    f"₹ {result['predicted_price_in_INR']:,.2f}"
-                )
-
-            st.markdown("---")
-
-            st.markdown("### 🏡 Property Summary")
-
-            s1, s2, s3, s4 = st.columns(4)
-
-            with s1:
-                st.metric("City", City)
-
-            with s2:
-                st.metric("Property Type", Property_Type)
-
-            with s3:
-                st.metric("BHK", BHK)
-
-            with s4:
-                st.metric("Area", f"{Super_Area_SqFt:,.0f} SqFt")
-
-        else:
-            st.error(
-                f"Prediction failed: {response.text}"
+        with col2:
+            st.metric(
+                "Estimated Price in INR",
+                f"₹ {result['predicted_price_in_INR']:,.2f}"
             )
+
+        st.markdown("---")
+
+        st.markdown("### 🏡 Property Summary")
+
+        s1, s2, s3, s4 = st.columns(4)
+
+        with s1:
+            st.metric("City", City)
+
+        with s2:
+            st.metric("Property Type", Property_Type)
+
+        with s3:
+            st.metric("BHK", BHK)
+
+        with s4:
+            st.metric("Area", f"{Super_Area_SqFt:,.0f} SqFt")
 
     except requests.exceptions.ConnectionError:
         st.error(
-            "Unable to connect to FastAPI. Please start your backend."
+            "Unable to connect to Vercel FastAPI backend. "
+            "Please check your backend deployment."
         )
 
     except requests.exceptions.Timeout:
         st.error(
             "The prediction request timed out. Please try again."
         )
+
+    except requests.exceptions.HTTPError as e:
+        st.error(f"Backend HTTP error: {e}")
+        st.code(response.text)
+
+    except (KeyError, ValueError) as e:
+        st.error(f"Invalid prediction response from backend: {e}")
 
     except Exception as e:
         st.error(f"An error occurred: {e}")
